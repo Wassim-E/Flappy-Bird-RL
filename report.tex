@@ -27,16 +27,16 @@
 \maketitle
 
 \begin{abstract}
-The goal of this work is to implement agents to solve Text Flappy Bird in two settings (without screen and with screen) and compare the performance of different methods. I first train tabular Monte Carlo and SARSA on compact no-screen observations, then test Monte Carlo on raw screen observations. Because raw screen states are too numerous for direct tabular learning, I encode screens into discrete latent vectors and train Monte Carlo on encoded states. This final approach clearly improves over the raw-screen baseline while keeping a tabular control loop.
+The goal of this work is to implement agents to solve Text Flappy Bird in two settings (without screen and with screen) and compare the performance of different methods. I first train tabular Monte Carlo and SARSA on compact no-screen observations, then test Monte Carlo on raw screen observations. Because raw screen states are too numerous for direct tabular learning, I encode screens into discrete latent vectors and train Monte Carlo on encoded states. This final approach clearly improves over the raw-screen baseline while keeping a tabular control loop. The source code and trained models are available at: \url{https://github.com/Wassim-E/Flappy-Bird-RL}.
 \keywords{Reinforcement learning \and Flappy Bird}
 \end{abstract}
 
 \section{Objective and Environment}
-The goal of this work is to implement and compare agents for Text Flappy Bird in no-screen and screen settings. The screen is a matrix containing 3 values (0,1,2). The position of the bird and the pipes are thus integer, so is the distance. I use the two environments available in the gym. \textbf{TextFlappyBird-v0} (no-screen): the state gives the distance between the bird and the center of the next pipe gap. \textbf{TextFlappyBird-screen-v0} (screen): the state is the full grid/screen array. During training I add a score cap (1000) to stop very long episodes and keep runs computationally manageable.
+The goal of this work is to implement and compare agents for Text Flappy Bird in no-screen and screen settings. The screen is a matrix containing 3 values (0,1,2). The position of the bird and the pipes are thus integer, so is the distance. I use the two environments available in the gym. \textbf{TextFlappyBird-v0} (no-screen): the state gives the distance between the bird and the center of the next pipe gap. \textbf{TextFlappyBird-screen-v0} (screen): the state is the full grid array. During training I add a score cap of 1000 to stop very long episodes and keep runs computationally manageable.
 
 \section{No-Screen Implementation}
 \subsection{Monte Carlo Agent}
-I first implemented an every-visit Monte Carlo control agent with epsilon-greedy exploration. The first implementation already worked well, but took time to train (100k games).
+I first implemented an every-visit Monte Carlo control agent with epsilon-greedy exploration. The first implementation already worked well, but took time to train (100k games and around 15 min).
 
 \begin{figure}[H]
 	\centering
@@ -100,7 +100,7 @@ The main reason is likely the huge number of possible states when the full scree
 \subsection{Encoding the Screen into a Vector}
 To reduce the state-space size, I trained autoencoders to encode each screen into a compact latent vector, then discretized the latent values (floored) so they can be used as tabular state identifiers.
 
-I evaluated three model families and multiple settings for latent dimension, hidden size, and latent scale. The loss is from the reconstruction from the floored value.
+I evaluated three model families and multiple settings for latent dimension, hidden size, and latent scale. The autoencoder encodes the screen into a vector, then decodes it and compares the reconstruction with the original. I kept this architecture but then created a discretizer that would floor the value of the encoded vector on a scale from 1 to latent scale. Since discretization is not continuous I couldn't train my model on it and instead used it as validation: I created a reconstruction loss from the floored encoded vector.
 
 \begin{figure}[H]
 	\centering
@@ -114,7 +114,16 @@ I evaluated three model families and multiple settings for latent dimension, hid
 	\caption{Latent scale vs. latent dimension trade-off.}
 \end{figure}
 
-This gave intersting but predictable results. The most important factor for the quality of the encoding is the number of states. In the end I chose $20^3=8000$ as the parameters. To qualitatively validate the encoding pipeline, I also inspected reconstruction dynamics (a GIF is available on the Github Repository).
+This gave interesting but predictable results. The most important factor for encoding quality is the number of states; I eventually settled for a vector of size 3 with 20 possible value, which represented $20^3=8000$ states. To qualitatively validate the pipeline, I inspected the reconstruction dynamics (an animated diagnostic is available on the \href{https://github.com/Wassim-E/Flappy-Bird-RL/blob/main/plots/img_latent_reconstruction.gif}{Github Repository}).
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.9\textwidth]{plots/img_reconstruction.png}
+	\caption{Reconstruction of the screen from the Autoencoder}
+\end{figure}
+
+This allowed me to significantly reduce the number of states for the screen version. Originally there was around a million states. I reduced it to 8k. I would never have been able to reach the performance of the no-screen implementation (less thsan 100 states) since I trained the autoencoder on reconstruction.
 
 \section{Monte Carlo on Encoded Screen States}
 After encoding, I trained a Monte Carlo agent that uses the discretized latent tuple as the tabular state.
